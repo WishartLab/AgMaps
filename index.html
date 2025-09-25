@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+
+	<title>Soil Maps</title>
+	<link rel="shortcut icon" type="image/x-icon" href="../favicon.ico">
+
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" />
+	<style>
+		
+		.border-img {
+			border: 0.2em solid rgb(223, 223, 223);
+			width: 100%;
+			height: 12em;
+			border-radius: 0.4em;
+			max-width: 20em;
+			/*max-width: 70%;*/
+			display: block;
+			margin-left: auto;
+			margin-right: auto;
+		}
+
+		.img-caption {
+			text-align: center;
+			font-weight: bold;
+			color: rgb(114, 114, 114);
+			margin-top: 0.5em;
+		}
+
+		.logo {
+			/* These options are to prevent anti-aliasing */
+			image-rendering: optimizeSpeed;
+			/* STOP SMOOTHING, GIVE ME SPEED	*/
+			image-rendering: -moz-crisp-edges;
+			/* Firefox						*/
+			image-rendering: -o-crisp-edges;
+			/* Opera							*/
+			image-rendering: -webkit-optimize-contrast;
+			/* Chrome (and eventually Safari) */
+			image-rendering: pixelated;
+			/* Chrome */
+			image-rendering: optimize-contrast;
+			/* CSS3 Proposed					*/
+			-ms-interpolation-mode: nearest-neighbor;
+			/* IE8+							 */
+		}
+
+		.myTable {
+			table-layout: fixed;
+			border-spacing: 15px;
+			width: 1024px;
+			/* virtual pixel width of many iPads */
+
+		}
+
+		.myRow {
+			display: table-row;
+		}
+
+		.myCol {
+			display: table-cell;
+		}
+
+		.well.myCol {
+			position: relative;
+			height: 16em;
+			display: table-cell;
+			overflow: hidden;
+			perspective: 1000px;
+		}
+
+		.flip-inner {
+			left:0;
+			position: absolute;
+			height: 100%;
+			width: 100%;
+			transition: transform 0.8s;
+			transform-style: preserve-3d;
+		}
+		.well.myCol:hover .flip-inner {
+			transform: rotateY(180deg);
+		}
+
+		.flip-front, .flip-back {
+			width: 100%;
+			height: 100%;
+			position: absolute;
+			-webkit-backface-visibility: hidden; /* Safari */
+			backface-visibility: hidden;
+		}
+		.flip-back {
+			padding-left: 2em;
+			padding-right: 2em;
+			transform: rotateY(180deg);
+			background-color: #F5F5F5;
+		}
+
+		.sectionStats {
+			text-align: left;
+		}
+
+		.heatmapTitle {
+			font-size: large;
+			font-weight: 500;
+			position: relative;
+			top: 3px;
+		}
+
+		figcaption {
+			text-align: center;
+			margin-bottom: 0.5em;
+		}
+
+		td {
+			padding: 5px;
+			vertical-align: top;
+		}
+
+		.notice {
+			display: inline-block;
+			vertical-align: middle;
+			width: 100%;
+			padding: 15px 15px 7px 20px;
+			background-color: #eae0ff;
+			border-style: solid;
+			border-width: 2px;
+			border-color: #c9b1ff;
+			border-radius: 4px;
+		}
+	</style>
+</head>
+
+
+<body>
+	<nav class="navbar navbar-default navbar-static-top" role="navigation">
+
+		<div class="navbar-header">
+			<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#collapseNavbar">
+				<span class="icon-bar"></span>
+				<span class="icon-bar"></span>
+				<span class="icon-bar"></span>
+			</button>
+			<span class="navbar-brand" id="heatmapper-logo" style="cursor:pointer">Soil Maps</span>
+		</div>
+
+		<div class="collapse navbar-collapse" id="collapseNavbar">
+			<ul class="nav navbar-nav">
+				<li id="geomapTab">
+					<a id="geomapLink" href="https://heatmapper2.ca/site/geomap/index.html">Geomap</a>
+				</li>
+				<li id="geocoordinateTab">
+					<a id="geocoordinateLink" href="https://heatmapper2.ca/site/geocoordinate/index.html">Geocoordinate</a>
+				</li>
+				<li id="aboutTab">
+					<a id="aboutLink" href="https://github.com/WishartLab/heatmapper2/wiki">About</a>
+				</li>
+			</ul>
+		</div>
+
+	</nav>
+
+
+	<div class="myTable" style="padding-left: 30px; padding-right: 30px;">
+		<div class="myRow" style="display: flex; justify-content: space-between;">
+			<h2 style="padding-left: 10px;"><b>Soil Maps</b></h2>
+			<div style="width:33%; border: 2px solid #a2c78f; border-radius: 4px; background-color: #deffce; padding-top:0.6em; padding-left:0.6em;">
+				<img src="https://github.com/wishartlab/heatmapper2/blob/working/site/cursor.png?raw=true"
+					style="width:48px; padding-left:0.2em; padding-right:0.8em; padding-top:0.1em; float:left;">
+
+				<p style="text-align:center;">
+					Click on the menu tabs above or <br>the buttons below to start making <br>your heatmap!
+				</p>
+			</div>
+		</div>
+	</div>
+	
+	<div class="myTable" style="display:table; padding-left: 15px; padding-right: 15px;">
+
+		<div class="myRow">
+			<div class="well myCol">
+				<div class="flip-inner">
+					<div class="flip-front">
+						<figure>
+							<a id="geomapImg" href="https://heatmapper2.ca/site/geomap/index.html">
+								<img src="https://github.com/WishartLab/heatmapper2/wiki/assets/Geomap.png" alt="Geomap"
+									class="border-img" style="width: auto; max-width: 100%; height: auto;">
+							</a>
+							<p class="img-caption">GEOMAP</p>
+						</figure>
+					</div>
+					<div class="flip-back">
+						<a id="geomapDescr" href="https://heatmapper2.ca/site/geomap/index.html">
+							<b>GEOMAP</b><br>Display values for defined territories on a map using GeoJSON files. Have temporal data? Scrub through time points with a media player-style slider. <br><br>Supports .txt, .dat, .tsv, .tab, and .xlsx files, plus .geojson for maps.
+						</a>
+					</div>
+				</div>
+			</div>
+			<div class="well myCol">
+				<div class="flip-inner">
+					<div class="flip-front">
+						<figure>
+							<a id="geocoordinateImg" href="https://heatmapper2.ca/site/geocoordinate/index.html">
+								<img src="https://github.com/WishartLab/heatmapper2/wiki/assets/Geocoordinate.png"
+									alt="Geocoordinate" class="border-img" style="width: auto; max-width: 100%; height: auto;">
+							</a>
+							<p class="img-caption">GEOCOORDINATE</p>
+						</figure>
+					</div>
+					<div class="flip-back">
+						<a id="geocoordinateDescr" href="https://heatmapper2.ca/site/geocoordinate/index.html">
+							<b>GEOCOORDINATE</b><br>Plot coordinates with associated values onto a map. Have temporal data? Scrub through time points with a media player-style slider. <br><br>Supports .txt, .dat, .tsv, .tab, and .xlsx files.
+						</a>
+					</div>
+				</div>
+			</div>
+			<div class="well myCol">
+				<figure>
+					<a id="aboutImg" href="https://github.com/WishartLab/heatmapper2/wiki">
+						<img src="https://github.com/WishartLab/heatmapper2/wiki/assets/About.png" alt="About"
+							class="border-img" style="width: auto; max-width: 100%; height: auto;">
+					</a>
+					<p class="img-caption">ABOUT</p>
+				</figure>
+			</div>
+		</div>
+	</div>
+
+	<div style="font-size: small; text-align:center;">
+		Questions or comments? Please use our <a href="http://feedback.wishartlab.com/?site=heatmapper"
+			target="_blank">feedback page</a>.
+		License: <a href="http://creativecommons.org/licenses/by-sa/2.0/" target="_blank">CC-BY-SA</a>
+	</div>
+
+	<script>
+		// Function to check for WebAssembly support
+		function isWebAssemblySupported() {
+			try {
+				if (typeof WebAssembly === "object" && typeof WebAssembly.instantiate === "function") {
+					return true;
+				}
+			} catch (e) { }
+			return false;
+		}
+
+		// Modify links only if WebAssembly is not supported
+		window.onload = function () {
+			if (!isWebAssemblySupported()) {
+				document.getElementById('geomapLink').href = 'http://server.heatmapper2.ca/geomap';
+				document.getElementById('geocoordinateLink').href = 'http://server.heatmapper2.ca/geocoordinate';
+
+				document.getElementById('geomapImg').href = 'http://server.heatmapper2.ca/geomap';
+				document.getElementById('geocoordinateImg').href = 'http://server.heatmapper2.ca/geocoordinate';
+			}
+		};
+	</script>
+</body>
+
+</html>
