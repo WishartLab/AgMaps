@@ -580,11 +580,19 @@ def server(input, output, session):
 				return ui.HTML('Make sure a GeoJSON is selected in the sidebar, <br>or upload your own following the <a href="https://geojson.org/"; target="_blank"; rel=”noopener noreferrer”>GeoJSON format</a>.')
 			
 			map_type = config.MapType()  # background map: either CartoDB or OSM
+			if map_type == "Esri World Imagery":
+				map_type = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+				attribution = ('Powered by <a href="https://www.esri.com">Esri</a>. Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community')
+			elif map_type == "OpenStreetMap":
+				attribution = ('&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors')
+			elif map_type == "CartoDB Positron":
+				attribution = ('&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
+				   'contributors, &copy; <a href="https://carto.com/attribution">CARTO</a>')
 
 			# Give a placeholder map if nothing is selected, which should never really be the case.
-			if df_choropleth.empty or geojson is None: return FoliumMap((53.5213, -113.5213), tiles=map_type, zoom_start=15)
+			if df_choropleth.empty or geojson is None: return FoliumMap((53.5213, -113.5213), tiles=map_type, attr=attribution, zoom_start=15)
 
-			map = FoliumMap(tiles=map_type, zoom_control="topleft", zoom_start=2)
+			map = FoliumMap(tiles=map_type, attr=attribution, zoom_control="topleft", zoom_start=2)
 
 			###### create choropleth ######
 			if df_choropleth is not None:
@@ -822,7 +830,7 @@ app_ui = ui.page_fluid(
 						config.KeyProperty.UI(ui.input_select, id="KeyProperty", label="GeoJSON Property", choices=[], tooltip="Select a property in the GeoJSON file that corresponds to the location names in your data. Click on the 'GeoJSON' tab in the main view area to see available properties in the currently selected GeoJSON file."),
 						
 						ui.HTML("<b>Heatmap</b>"),
-						config.MapType.UI(ui.input_select, id="MapType", label="Background Map", choices={"CartoDB Positron": "CartoDB", "OpenStreetMap": "OSM"}, tooltip="Specify the background map to plot your data on. CartoDB is a simpler map, while OSM is more highly annotated."),
+						config.MapType.UI(ui.input_select, id="MapType", label="Background Map", choices={"CartoDB Positron": "Simple Map", "OpenStreetMap": "Street Map", "Esri World Imagery": "Satellite"}, tooltip="Specify the background map to plot your data on. CartoDB is a simpler map, while OSM is more highly annotated."),
 						config.Opacity.UI(ui.input_slider, id="Opacity", label="Choropleth Opacity", min=0.0, max=1.0, step=0.1, tooltip="Specify the opacity of the heatmap. 1.0 indicates full opacity, while lower values make the background map more visible."),
 					),
 
