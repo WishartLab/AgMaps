@@ -83,35 +83,43 @@ def server(input, output, session):
 		filename = filepath.split("/")[-1]
 		return filename.split(".")[0]
 
-	async def MakeColumnSelectors(name):
+
+	async def MakeColumnSelectors(name, key, val, choice):
 		"""
 		@brief Create ui elements to select a name and value column from choropleth data files
 		"""
 		try:
-			# remove old ui elements
-			ui.remove_ui(selector=f"#KeyColumn{name}")
-			ui.remove_ui(selector=f"#ValueColumn{name}")
+			# remove old ui elements and labels
+			ui.remove_ui(selector=f"#{name}_column_select")
 		except Exception as e:
 			print(f"Error removing previous column selectors for {name}:\n{e}")
-		key = ui.input_select(
+
+		key_ui = ui.input_select(
 			id=f"KeyColumn{name}",
-			label=f"Location Names - {name}", 
-			choices=[]
+			label=f"Location Names", 
+			choices=[key],
+			#selected=key,
 			)
-		val = ui.input_select(
+		val_ui = ui.input_select(
 			id=f"ValueColumn{name}", 
-			label=f"Value Column - {name}", 
-			choices=[]
+			label=f"Value Column", 
+			choices=val,
+			selected=val[choice],
+			)
+		accordion = ui.accordion(
+				ui.accordion_panel(
+					f"{name}",
+					ui.input_checkbox_group(id=f"Disable{name}", inline=False, label=None, choices=["Disable Layer"], selected=None),
+					key_ui,
+					val_ui,
+					# ui.input_slider(id=f"OpacityChoro{name}", label="Opacity", min=0.0, max=1.0, step=0.1),
+				), 
+				id=f"{name}_column_select"
 			)
 		ui.insert_ui(
-			key,
+			accordion,
 			selector="#ChoroplethSettings",
-			where="beforeBegin",
-		)
-		ui.insert_ui(
-			val,
-			selector="#ChoroplethSettings",
-			where="beforeBegin",
+			where="beforeEnd",
 		)
 
 
@@ -163,7 +171,7 @@ def server(input, output, session):
 			accordion = ui.accordion(
 				ui.accordion_panel(
 					f"{name} Colors",
-					ui.input_select(id=f"{name}ColorSelect", label=f"Colors for {name}", choices=Colors, multiple=True, selectize=True, selected=list(Colors)[0:3]),
+					ui.input_select(id=f"{name}ColorSelect", label=None, choices=Colors, multiple=True, selectize=True, selected=list(Colors)[0:3]),
 				), 
 				id=f"{name}_colour_dropdowns"
 			)
@@ -182,49 +190,42 @@ def server(input, output, session):
 		@info Update data when the choropleth data file is selected or modified.
 		"""
 		p = ui.Progress()
-		#try:
-		DataChoropleth.set((await DataCache.Load(
-			input, 
-			p=p,
-			input_switch="Example",
-			example="Example",
-			example_file = input.Example(),
-		)))
-		Valid.set(False)
+		try:
+			DataChoropleth.set((await DataCache.Load(
+				input, 
+				p=p,
+				input_switch="Example",
+				example="Example",
+				example_file = input.Example(),
+			)))
+			Valid.set(False)
 
-		data = DataChoropleth()  # dict of df
-		
-		for filepath in data:
-			# make Key Column and Value Column ui elements
-			df = data[filepath]
-			name = GetNameFromPath(filepath)
-			await MakeColumnSelectors(name)
-			time.sleep(3)
-			# HERE whaaaaaaaaaaat is wrong :(
-			# get options for key and value column names
-			columns = df.columns
-			key = Filter(columns, ColumnType.Name, id=f"KeyColumn{name}")
-			val = Filter(columns, ColumnType.Value, id=f"ValueColumn{name}", all=True)
-			print(f"val: {val}")
-			if val:
-				choice = 0
-				while choice < len(val) and val[choice] == key:
-					choice += 1
-				ui.update_select(id=f"ValueColumn{name}", selected=val[choice])
-				print(f"val[choice]: {val[choice]}")
-				temp_name = f"ValueColumn{name}"
-				temp = getattr(input, temp_name)()
-				print(f"temp: {temp}")
+			data = DataChoropleth()  # dict of df
+			
+			for filepath in data:
+				# make Key Column and Value Column ui elements
+				df = data[filepath]
+				name = GetNameFromPath(filepath)
+				# get options for key and value column names
+				columns = df.columns
+				key = Filter(columns, ColumnType.Name, id=None)
+				val = Filter(columns, ColumnType.Value, id=None, all=True)
+				if val:
+					choice = 0
+					while choice < len(val) and val[choice] == key:
+						choice += 1
 				
+				await MakeColumnSelectors(name, key, val, choice)
+
 				# make colour selectors for each category in val column
 				await MakeColorSelectors(name, df, val[choice])
 
-		DataCache.Invalidate(File(input))
-		# except Exception as e:
-		# 	print(f"choropleth error: {e}")
-		# 	p.close()
-		# 	Error("File could not be loaded!\nChoropleth data can be uploaded as a .csv, .tsv, .txt, .xslx, .dat, .tab, or .odf file.")
-		# 	return
+			DataCache.Invalidate(File(input))
+		except Exception as e:
+			print(f"choropleth error: {e}")
+			p.close()
+			Error("File could not be loaded!\nChoropleth data can be uploaded as a .csv, .tsv, .txt, .xslx, .dat, .tab, or .odf file.")
+			return
 
 
 	@reactive.effect
@@ -412,12 +413,20 @@ def server(input, output, session):
 		@param k_prop: 
 		@param name(str): name of the file that data was pulled from
 		"""
+		# check if layer is disabled
+		disable_name = f"Disable{name}"
+		disable = getattr(input, disable_name)()
+		if disable:
+			return
+
 		# turn geojson dict into a df
 		geojson_df = GeoDataFrame.from_features(geojson, crs="EPSG:4326")
 		# merge with data df based on k_prop and k_col
 		merged = geojson_df.merge(df, how="left", left_on=k_prop, right_on=k_col)
 
 		opacity = config.Opacity()
+		# opacity_name = f"OpacityChoro{name}"
+		# opacity = getattr(input, opacity_name)()
 		
 		df_dict = df.set_index(k_col)[v_col]
 		df_dict = df_dict.to_dict()
@@ -439,6 +448,8 @@ def server(input, output, session):
 			vmax = max(values)
 			selected_colors_num_ui = f"{name}ColorSelect"
 			selected_colors_num = getattr(input, selected_colors_num_ui)()
+			if len(selected_colors_num) < 2:
+				selected_colors_num += selected_colors_num
 			colormap = LinearColormap(selected_colors_num, vmin=vmin, vmax=vmax)
 			GeoJson(
 				merged,
@@ -580,7 +591,6 @@ def server(input, output, session):
 	@render.data_frame
 	def Table(): 
 		#TODO: modify for multiple choropleths! Currently just displays first in list
-		#df = DataChoropleth()
 		data = DataChoropleth()
 		filepath = next(iter(data))
 		df = data[filepath]
@@ -669,6 +679,7 @@ def server(input, output, session):
 					df_choro = df_choropleth[df_filepath]
 					# HERE iiiiiiiiiiii
 					v_col_name = f"ValueColumn{name_choro}"
+					print(f"GenerateHeatmap:\tValueColumn{name_choro}")
 					v_col = getattr(input, v_col_name)()
 					print(f"v_col: {v_col}")
 					k_col_name = f"KeyColumn{name_choro}"

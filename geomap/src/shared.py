@@ -135,7 +135,10 @@ def Filter(columns, ctype: ColumnType, good: list = [], id=None, all=False, remo
 					options -= Columns[type]
 			indices = [folded.index(value) for value in options]; indices.sort()
 			reassembled = good + [columns[index] for index in indices]
-		ui.update_select(id=id, choices=reassembled)
+		ui.update_select(
+			id=id, 
+			choices=reassembled,
+			)
 	if all: return reassembled
 	return reassembled[0] if reassembled and len(reassembled) > 0 else None
 
