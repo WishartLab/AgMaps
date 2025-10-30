@@ -22,13 +22,9 @@ from pandas import DataFrame, read_csv, read_excel, read_table
 import openpyxl
 
 # Used for fetching web resources
-URL = "https://wishartlab.github.io/heatmapper2"
-Raw = "https://raw.githubusercontent.com/wishartlab/heatmapper2/main"
+URL = "https://wishartlab.github.io/agmaps"
+Raw = "https://raw.githubusercontent.com/wishartlab/agmaps/main"
 
-# Define the Server and Port of the Shiny instances (Port is incremented)
-# Change these if Heatmapper is running on a server.
-Server = "http://server.heatmapper2.ca"
-Port = 8000
 
 # Icon to display for tooltips
 TooltipIcon = ui.HTML(
@@ -57,12 +53,12 @@ else:
 
 # Shared Values
 Colors = {
-	"#ff0000": "Red",
-	"#ff9900": "Orange",
-	"#fff200": "Yellow",
-	"#00ff80": "Green",
-	"#00bfff": "Blue",
 	"#8000ff": "Purple",
+	"#00bfff": "Blue",
+	"#00ff80": "Green",
+	"#fff200": "Yellow",
+	"#ff9900": "Orange",
+	"#ff0000": "Red",
 	"#ff00aa": "Pink",
 	"#7d7d7d": "Gray",
 	"#ffffff": "White",
@@ -284,29 +280,36 @@ class Cache:
 			if p: p.close()
 			return 0
 
-		#if source_file is None: source_file = input.File()
-		if example_file is None: example_file = input.Example()
+		#if source_file is None: source_file = input.Example()
+		#if example_file is None: example_file = input.Example()
 		if source is None: source = self._source
-		#if input_switch is None: input_switch = input.SourceFile()
+		#if input_switch is None: input_switch = "Example"
 
-		# Grab an uploaded file, if its done, or grab an example (Using a cache to prevent redownload)
-		if input_switch == upload:
-			if p: p.inc(message=f"Loading Uploaded {p_name}...")
-			file: list[FileInfo] | None = source_file
+		# Example files can be on disk or on a server depending on whether we're in a WASM environment.
+		if input_switch == example:
+			if p: p.inc(message=f"Fetching {p_name}...")
+			file: list[FileInfo] | None = example_file
 			if file is None:
 				if p: p.close()
 				return default
-
-			if p: p.inc(message=f"Handling {p_name}...")
-			# The datapath can be immediately used to load examples, but we explicitly need to use
-			# Local as a user uploaded file will always be fetched on disk.
+			elif type(file) != list and type(file) != tuple:
+				file = [file]
+			
+			if p: p.inc(message=f"Handling {p_name}")
+			# load example files from datapath
 			all_n = []
+			print(f"load file: {file}")
 			for i in range(len(file)):
-				n = str(file[i]["datapath"])
+				#n = str(file[i]["datapath"])
+				n = file[i]  # filename
 				if n.endswith(wasm_blacklist) and Pyodide:
 					continue
+				elif n.startswith("https://"):
+					n = n if Pyodide else str(source + n.split("/")[-1])
+				else:
+					n = str(source + n)  # full file path
 				all_n.append(n)
-				if n not in self._primary: self._primary[n] = self._handler(Path(n), p)
+				if n not in self._primary: self._primary[n] = self._handler(Path(n), p)  # add actual data to primary (df or dict)
 
 			if len(all_n) < 1:
 				if p: p.close()
@@ -325,10 +328,6 @@ class Cache:
 				for x in all_n:
 					n_dict[x] = self._primary[x]
 				return n_dict
-
-		# Example files, conversely, can be on disk or on a server depending on whether we're in a WASM environment.
-		elif input_switch == example:
-			if p: p.inc(message=f"Fetching {p_name}...")
 
 			# If we explicitly provide a URL, use it, but only in Pyodide (We still assume the file exists on disk when running
 			# in server-mode).
@@ -392,20 +391,16 @@ def NavBar():
 	@returns A ui.navset_bar.
 	"""
 
-	Sources = {
-		"geomap": f"{URL}/site/geomap/index.html" if Pyodide else f"{Server}/geomap",
-	}
-
 	return (
 		#ui.panel_title(title=None, window_title="Heatmapper"),  # added to app.py for each category to display page name
 		ui.navset_bar(
-			ui.nav_control(ui.HTML(f'<a href="{Sources["geomap"]}" target="_blank" rel="noopener noreferrer" style="font-size: 12pt;">Maps</a>')),
+			ui.nav_control(ui.HTML(f'<a href="https://www.safe-hub.ca/" target="_blank" rel="noopener noreferrer" style="font-size: 12pt;">Home</a>')),
 			ui.nav_control(ui.HTML('<a href=https://github.com/WishartLab/heatmapper2/wiki target="_blank" rel="noopener noreferrer" style="font-size: 12pt;">About</a>')),
 			ui.nav_spacer(),
 			ui.nav_control(ui.input_dark_mode(id="mode")),
 			title=ui.HTML(
 				f'<a href="{URL}" target="_blank" rel="noopener noreferrer"> \
-					<img src="{Raw}/site/logo.png" alt="Soil Maps"> \
+					<img src="{Raw}/site/logo.png" alt="Soil Maps" width="50"> \
 				</a>'),
 		),
 	)

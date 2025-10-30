@@ -1,3 +1,6 @@
+# Ecodistrict source: https://sis.agr.gc.ca/cansis/publications/maps/eco/all/districts/index.html
+
+
 #
 # -----RUN WEBASSMEBLY-----
 # This file contains the ShinyLive application for choropleth + coordinate maps.
@@ -14,8 +17,9 @@
 
 from shiny import App, reactive, render, ui
 from folium import Map as FoliumMap, Choropleth, Circle, GeoJson, Rectangle
-from folium.features import GeoJsonTooltip
+from folium.features import GeoJsonTooltip, GeoJsonPopup
 from folium.plugins import TimeSliderChoropleth, HeatMap as FoliumHeatMap, HeatMapWithTime
+from geopandas import GeoDataFrame
 from pandas import DataFrame
 from branca.colormap import linear, LinearColormap, StepColormap
 from pathlib import Path
@@ -27,6 +31,7 @@ from scipy.interpolate import griddata
 from numpy import vstack, linspace, meshgrid
 from math import sqrt
 import re
+import time
 
 from shared import Cache, Colors, Inlineify, NavBar, MainTab, Pyodide, Filter, ColumnType, TableOptions, Raw, InitializeConfig, ColorMaps, Error, Update, Msg, File
 from geojson import Mappings
@@ -42,10 +47,14 @@ import branca, certifi, xyzservices
 URL = f"{Raw}/geomap/data/" if Pyodide else "../data/"
 
 def server(input, output, session):
+	new_load_flag = reactive.value(False)
+	@reactive.effect
+	def set_load_flag():
+		new_load_flag.set(True)
 
 	InfoChoropleth = {
 		"Backyard_Hens_and_Bees.csv": '''<u>Input type:</u> .csv Data <br><u>Contents:</u> Number of properties with hens or bees in Edmonton, by neighbourhood.''',
-		"example6.csv": '''<u>Input type:</u> .csv Data<br> <u>Contents:</u> COVID-19 information by province or territory, reported by the Canadian Government, from February 8, 2020 to February 17, 2024. The 'Value Column' dropdown indicates which column is visualized. <br><u>Source:</u> <a href="https://open.canada.ca/data/en/dataset/261c32ab-4cfd-4f81-9dea-7b64065690dc/resource/39434379-45a1-43d5-aea7-a7a50113c291"; target="_blank">Open Data Portal</a>''',
+		"FormerMunicipalities.csv": '''<u>Input type:</u> .csv Data<br> <u>Contents:</u> Former municipalities absorbed by the city of Edmonton. <br><u>Source:</u> <a href="https://en.wikipedia.org/wiki/List_of_neighbourhoods_in_Edmonton"; target="_blank">Wikipedia</a>''',
 	}
 
 	def HandleData(paths:list, p=None):
@@ -66,40 +75,99 @@ def server(input, output, session):
 	InitializeConfig(config, input)
 
 
-	async def MakeColorSelectors(column_name):
+	def GetNameFromPath(filepath:str) -> str:
 		"""
-		@info For each category of choropleth data, create a colour selector ui element.
+		@brief Given a filepath, extract the file name with no extension
+		"""
+		# TODO: user pathlib instead
+		filename = filepath.split("/")[-1]
+		return filename.split(".")[0]
+
+	async def MakeColumnSelectors(name):
+		"""
+		@brief Create ui elements to select a name and value column from choropleth data files
+		"""
+		try:
+			# remove old ui elements
+			ui.remove_ui(selector=f"#KeyColumn{name}")
+			ui.remove_ui(selector=f"#ValueColumn{name}")
+		except Exception as e:
+			print(f"Error removing previous column selectors for {name}:\n{e}")
+		key = ui.input_select(
+			id=f"KeyColumn{name}",
+			label=f"Location Names - {name}", 
+			choices=[]
+			)
+		val = ui.input_select(
+			id=f"ValueColumn{name}", 
+			label=f"Value Column - {name}", 
+			choices=[]
+			)
+		ui.insert_ui(
+			key,
+			selector="#ChoroplethSettings",
+			where="beforeBegin",
+		)
+		ui.insert_ui(
+			val,
+			selector="#ChoroplethSettings",
+			where="beforeBegin",
+		)
+
+
+	async def MakeColorSelectors(name, df, column_name):
+		"""
+		@info If data is categorical, for each category of choropleth data, create a colour selector ui element.
+		Else if data is numerical, create a colour scheme selector
+		@param filepath(str): used to uniqeuly identify ui elements
+		@param df(pandas df): dataframe containing the value column
+		@param column_name(str): the column with choropleth values
 		"""
 		try:
 			# remove old colour dropdowns
-			ui.remove_ui(selector="#dynamic_colour_dropdowns")
+			ui.remove_ui(selector=f"#{name}_colour_dropdowns")
 		except Exception as e:
 			print(f"Error removing previous colour selectors:\n{e}")
-
-		# get all categories
-		categories = DataChoropleth()[column_name].unique()
 
 		# get all colors
 		color_keys = list(Colors)
 		color_index = 0
+		
+		# get unique values in value column
+		values = df[column_name].unique()
+		# are values numerical or categorical?
+		data_type = GetChoroplethDataType(values)
 
-		all_color_select = []
-		for category in categories:
-			# remove invalid characters for id name
-			category_clean = re.sub(r"\s+", "", str(category))
-			category_clean = re.sub(f"[^a-zA-Z0-9]", "_", category)
-			color_select = ui.input_select(id=f"ColorSelect{category_clean}", label=f"{category}", choices=Colors, multiple=False, selectize=True, selected=color_keys[color_index])
-			all_color_select.append(color_select)
-			if color_index < (len(color_keys) - 1):
-				color_index += 1
+		# user can select a colour for each category
+		if data_type == "categorical":
+			all_color_select = []
+			for category in values:
+				# remove invalid characters for id name
+				category_clean = re.sub(r"\s+", "", str(category))
+				category_clean = re.sub(f"[^a-zA-Z0-9]", "_", category)
+				color_select = ui.input_select(id=f"{name}Select{category_clean}", label=f"{category}", choices=Colors, multiple=False, selectize=True, selected=color_keys[color_index])
+				all_color_select.append(color_select)
+				if color_index < (len(color_keys) - 1):
+					color_index += 1
 
-		accordion = ui.accordion(
-			ui.accordion_panel(
-				"Choropleth Colors",
-				*all_color_select,
-			), 
-			id="dynamic_colour_dropdowns"
-		)
+			accordion = ui.accordion(
+				ui.accordion_panel(
+					f"{name} Colors",
+					*all_color_select,
+				), 
+				id=f"{name}_colour_dropdowns"
+			)
+
+		# user can select colours for a linear scheme
+		else:
+			accordion = ui.accordion(
+				ui.accordion_panel(
+					f"{name} Colors",
+					ui.input_select(id=f"{name}ColorSelect", label=f"Colors for {name}", choices=Colors, multiple=True, selectize=True, selected=list(Colors)[0:3]),
+				), 
+				id=f"{name}_colour_dropdowns"
+			)
+
 		ui.insert_ui(
 			accordion,
 			selector="#ChoroplethSettings",
@@ -108,61 +176,81 @@ def server(input, output, session):
 
 
 	@reactive.effect
-	@reactive.event(input.Example, input.Reset)
+	@reactive.event(input.Example, input.Reset, new_load_flag)
 	async def UpdateDataChoropleth():
 		"""
 		@info Update data when the choropleth data file is selected or modified.
 		"""
 		p = ui.Progress()
-		try:
-			DataChoropleth.set((await DataCache.Load(
-				input, 
-				p=p,
-				input_switch="Example",
-				example="Example",
-			)))
-			Valid.set(False)
+		#try:
+		DataChoropleth.set((await DataCache.Load(
+			input, 
+			p=p,
+			input_switch="Example",
+			example="Example",
+			example_file = input.Example(),
+		)))
+		Valid.set(False)
 
-			columns = DataChoropleth().columns
-			key = Filter(columns, ColumnType.Name, id="KeyColumn")
-			val = Filter(columns, ColumnType.Value, id="ValueColumn", all=True)
+		data = DataChoropleth()  # dict of df
+		
+		for filepath in data:
+			# make Key Column and Value Column ui elements
+			df = data[filepath]
+			name = GetNameFromPath(filepath)
+			await MakeColumnSelectors(name)
+			time.sleep(3)
+			# HERE whaaaaaaaaaaat is wrong :(
+			# get options for key and value column names
+			columns = df.columns
+			key = Filter(columns, ColumnType.Name, id=f"KeyColumn{name}")
+			val = Filter(columns, ColumnType.Value, id=f"ValueColumn{name}", all=True)
+			print(f"val: {val}")
 			if val:
 				choice = 0
-				while choice < len(val) and val[choice] == key: choice += 1
-				ui.update_select(id="ValueColumn", selected=val[choice])
+				while choice < len(val) and val[choice] == key:
+					choice += 1
+				ui.update_select(id=f"ValueColumn{name}", selected=val[choice])
+				print(f"val[choice]: {val[choice]}")
+				temp_name = f"ValueColumn{name}"
+				temp = getattr(input, temp_name)()
+				print(f"temp: {temp}")
 				
 				# make colour selectors for each category in val column
-				await MakeColorSelectors(val[choice])
+				await MakeColorSelectors(name, df, val[choice])
 
-			DataCache.Invalidate(File(input))
-		except Exception as e:
-			print(f"choropleth error: {e}")
-			p.close()
-			Error("File could not be loaded!\nChoropleth data can be uploaded as a .csv, .tsv, .txt, .xslx, .dat, .tab, or .odf file.")
-			return
+		DataCache.Invalidate(File(input))
+		# except Exception as e:
+		# 	print(f"choropleth error: {e}")
+		# 	p.close()
+		# 	Error("File could not be loaded!\nChoropleth data can be uploaded as a .csv, .tsv, .txt, .xslx, .dat, .tab, or .odf file.")
+		# 	return
 
 
 	@reactive.effect
-	@reactive.event(input.JSONUpload, input.JSONSelection, input.JSONFile)
+	@reactive.event(input.JSONSelection)
 	async def UpdateGeoJSON():
 		"""
 		Update data when the choropleth GeoJSON file is selected or modified.
 		"""
 		JSON.set(await DataCache.Load(
 			input,
-			source_file=input.JSONUpload(),
+			source_file=None,
 			example_file=input.JSONSelection(),
 			source=URL,
-			input_switch=input.JSONFile(),
+			input_switch="Provided",
 			example="Provided",
 			default=None,
 			p=ui.Progress(),
 			p_name="GeoJSON"
 		))
-		geojson = JSON()
+		full_geojson = JSON()
+		filepath = next(iter(full_geojson))
+		geojson = full_geojson[filepath]
 
 		if geojson is None: return
 		properties = list(geojson['features'][0]['properties'].keys())
+		# update config.KeyProperty()
 		Filter(properties, ColumnType.NameGeoJSON, id="KeyProperty")
 
 
@@ -170,7 +258,7 @@ def server(input, output, session):
 		"""
 		@info When coordinate files are uploaded, make a settings dropdown for each file.
 		"""
-		if input.CoordinateUpload():
+		if input.CoordinateSelection():
 			try:
 				# remove old layer settings dropdowns
 				ui.remove_ui(selector="#dynamic_accordion")
@@ -178,11 +266,11 @@ def server(input, output, session):
 				print(f"Error removing previous file settings:\n{e}")
 			
 			settings_dropdowns = []
-			for file in input.CoordinateUpload():
-				filename = file["name"]
-				name = filename.split(".")[0]
+			for file in input.CoordinateSelection():
+				#filename = file["name"]
+				name = file.split(".")[0]
 				dropdown = ui.accordion_panel(
-					f"{filename}", 
+					f"{file}", 
 					# enable/disable layer
 					ui.input_checkbox_group(id=f"Disable{name}", inline=False, label=None, choices=["Disable Layer"], selected=None),
 					
@@ -196,7 +284,7 @@ def server(input, output, session):
 					# select colours
 					ui.panel_conditional(
 						f"input.RenderMode{name} === 'Vector'",
-						ui.input_select(id=f"CustomColors{name}", label="Colors", choices=Colors, multiple=True, selectize=True, selected=["#ff0000","#ff9900","#fff200","#00ff80","#00bfff","#8000ff",]),
+						ui.input_select(id=f"CustomColors{name}", label="Colors", choices=Colors, multiple=True, selectize=True, selected=["#8000ff","#ff0000","#ff9900","#fff200","#00ff80","#00bfff"]),
 					),
 					# point radius
 					config.Radius.UI(ui.input_numeric, id=f"Radius{name}", label="Data Point Size", min=5, tooltip="Specify how large each data point should be on the map."),
@@ -235,22 +323,21 @@ def server(input, output, session):
 
 
 	@reactive.effect
-	@reactive.event(input.CoordinateFiles, input.CoordinateUpload, input.CoordinateSelection)
+	@reactive.event(input.CoordinateSelection)
 	async def UpdateCoordinateData():
 		"""
 		Update data when the coordinate data files are selected or modified.
 		"""
 		p = ui.Progress()
 
-		#if input.CoordinateSelection():
-		if input.CoordinateUpload():
+		if input.CoordinateSelection():
 			col_options = {}
 			try:
 				DataCoordinate.set((await DataCache.Load(
 					input, 
-					source_file=input.CoordinateUpload(),  # list of dicts
+					source_file=None,
 					example_file=input.CoordinateSelection(),
-					input_switch=input.CoordinateFiles(),
+					input_switch="Example",
 					example="Example",
 					p=p,
 					p_name="coordinate data"
@@ -258,15 +345,18 @@ def server(input, output, session):
 				))
 				Valid.set(False)  # list of df?
 				data = DataCoordinate()
-				
-				# for file in input.CoordinateSelection():
-				# 	print(f"\nCoordinateSelection file:\n{file}\n")
+				path_dict = {}
+				for filepath in data:
+					# TODO: use pathlib
+					filename = filepath.split("/")[-1]
+					path_dict[filename] = filepath
 
-				for file in input.CoordinateUpload():
-					file_df = data[str(file["datapath"])]
+				for file in input.CoordinateSelection():
+					# data[datapath]
+					mapped_filepath = path_dict[file]
+					file_df = data[mapped_filepath]
 
-					filename = file["name"]
-					name = filename.split(".")[0]
+					name = file.split(".")[0]
 					# get columns per file
 					# filter columns to get time and value dropdown options
 					columns = file_df.columns
@@ -284,7 +374,7 @@ def server(input, output, session):
 			except Exception as e:
 				print(f"coordinate error: {e}")
 				#p.close()
-				Error(ui.HTML("File could not be loaded!\nCoordinate data can be uploaded as a .csv, .tsv, .txt, .xslx, .dat, .tab, or .odf file."), e)
+				Error(ui.HTML("File could not be loaded!\nCoordinate data can be uploaded as a .csv, .tsv, .txt, .xslx, .dat, .tab, or .odf file.\n"), e)
 				return
 
 
@@ -295,106 +385,105 @@ def server(input, output, session):
 		return DataCoordinate()  # dict of {datapath: df}
 
 
-	def CustomChoroplethColorMap(categories:list):
+	def GetChoroplethDataType(data):
 		"""
-		@info Map categorical values to colours based on ui selections.
+		@brief Determine if data is numerical or categorical
+		@param categories(numpy.ndarray): a list of unique values
+		Returns: str indicating "numerical" or "categorical"
 		"""
-		colors = []
-		vmax = 0
-		indices = []
-		index = 0
-		category_to_index = {}
-
-		# map categories to indices
-		for category in categories:
-			category = re.sub(r"\s+", "", str(category))
-			category = re.sub(f"[^a-zA-Z0-9]", "_", category)
-			selected_color_ui = f"ColorSelect{category}"
-			selected_color = getattr(input, selected_color_ui)()
-
-			colors.append(selected_color)
-			category_to_index[category] = index
-			indices.append(index)
-			vmax = index
-			index += 1
-		
-		# return colormap function
-		return StepColormap(
-			colors,
-			vmin=0, vmax=vmax,
-			index=indices,
-		)
-			
+		data_type = "numerical"
+		for item in data:
+			try:
+				item = float(item)
+			except:
+				data_type = "categorical"
+				return data_type
+		return data_type 
 
 
-	def LoadChoropleth(df, map, geojson, k_col, v_col, k_prop, p):
+	def LoadChoropleth(df, map, geojson, k_col, v_col, k_prop, name, p):
 		"""
 		@brief Applies a Choropleth to a Folium Map
 		@param df: The DataFrame that contains information to plot
 		@param map: The Folium map
 		@param geojson: The geojson that contains territory info
-		@param k_vol: The name of the column within df that contains names
+		@param k_col: The name of the column within df that contains names
 		@param v_col: the name of the column within df that contains the values to plot.
 		@param k_prop: 
+		@param name(str): name of the file that data was pulled from
 		"""
+		# turn geojson dict into a df
+		geojson_df = GeoDataFrame.from_features(geojson, crs="EPSG:4326")
+		# merge with data df based on k_prop and k_col
+		merged = geojson_df.merge(df, how="left", left_on=k_prop, right_on=k_col)
+
+		opacity = config.Opacity()
+		
 		df_dict = df.set_index(k_col)[v_col]
 		df_dict = df_dict.to_dict()
 
-		categories = df[v_col].unique()
-		opacity = config.Opacity()
+		# add a popup that appears on click
+		popup = GeoJsonPopup(
+			fields=[k_prop, v_col],
+			aliases=["",""],
+			localize=True,
+			labels=True,
+		)
 
-		colors = []
-		vmax = 0
-		indices = []
-		index = 0
-		category_to_color = {}
-
-		# map categories to indices
-		for category in categories:
-			category_name = re.sub(r"\s+", "", str(category))
-			category_name = re.sub(f"[^a-zA-Z0-9]", "_", category)
-			selected_color_ui = f"ColorSelect{category_name}"
-			selected_color = getattr(input, selected_color_ui)()
-
-			colors.append(selected_color)
-			category_to_color[category] = selected_color
-			indices.append(index)
-			vmax = index
-			index += 1
-
-		# # custom colormap function
-		# colormap = StepColormap(
-		# 	colors=colors,
-		# 	vmin=0, vmax=vmax-1,
-		# 	index=indices,
-		# 	caption=f"Choropleth {v_col}"
-		# )
+		values = df[v_col].unique()
+		data_type = GetChoroplethDataType(values)
 		
-		# GeoJson(
-		# 	geojson,
-		# 	style_function=lambda x:
-		# 	{
-		# 		"fillColor": colormap(df_dict[x['properties']['name']]) if x['properties']['name'] in df_dict else "transparent",
-		# 		"color": "black",
-		# 		"weight": 0.5,
-		# 		"fillOpacity": opacity,
-		# 	}
-		# ).add_to(map)
+		# if data is numerical, make continuous colormap
+		if data_type == "numerical":
+			vmin = min(values)
+			vmax = max(values)
+			selected_colors_num_ui = f"{name}ColorSelect"
+			selected_colors_num = getattr(input, selected_colors_num_ui)()
+			colormap = LinearColormap(selected_colors_num, vmin=vmin, vmax=vmax)
+			GeoJson(
+				merged,
+				style_function=lambda x:
+				{
+					"fillColor": colormap(df_dict[x['properties']['name']]) if x['properties']['name'] in df_dict else "transparent",
+					"color": "black",
+					"weight": 0.5,
+					"fillOpacity": opacity,
+				},
+				#tooltip=tooltip,
+				popup=popup,
+			).add_to(map)
+		
+		# if data is categorical, make categorical colormap
+		else:
+			colors = []
+			indices = []
+			index = 0
+			category_to_color = {}
 
-		GeoJson(
-			geojson,
-			style_function=lambda x:
-			{
-				"fillColor": category_to_color[(df_dict[x['properties']['name']])] if x['properties']['name'] in df_dict else "transparent",
-				"color": "black",
-				"weight": 0.5,
-				"fillOpacity": opacity,
-			},
-			tooltip=GeoJsonTooltip(
-				fields=["name"],
-				aliases=[""],
-			)
-		).add_to(map)
+			# if categorical data, map categories to indices
+			for category in values:
+				category_name = re.sub(r"\s+", "", str(category))
+				category_name = re.sub(f"[^a-zA-Z0-9]", "_", category)
+				selected_color_ui = f"{name}Select{category_name}"
+				selected_color = getattr(input, selected_color_ui)()
+
+				colors.append(selected_color)
+				category_to_color[category] = selected_color
+				indices.append(index)
+				index += 1
+
+			GeoJson(
+				merged,
+				style_function=lambda x:
+				{
+					"fillColor": category_to_color[(df_dict[x['properties']['name']])] if x['properties']['name'] in df_dict else "transparent",
+					"color": "black",
+					"weight": 0.5,
+					"fillOpacity": opacity,
+				},
+				#tooltip=tooltip,
+				popup=popup,
+			).add_to(map)
 
 
 	def GenerateCoordinateMap(df, map, name, val_col, lat_col, lon_col):
@@ -490,7 +579,11 @@ def server(input, output, session):
 	@output
 	@render.data_frame
 	def Table(): 
-		df = DataChoropleth()
+		#TODO: modify for multiple choropleths! Currently just displays first in list
+		#df = DataChoropleth()
+		data = DataChoropleth()
+		filepath = next(iter(data))
+		df = data[filepath]
 		if df is None or df.empty:
 			return DataFrame({"Note": ["No data to display! Please upload your data or select an example data set in the sidebar."]})
 		try:
@@ -514,46 +607,14 @@ def server(input, output, session):
 	def Welcome():
 		return ui.HTML("""
 			<h1>Maps</h1>
-			Geomap displays values based on geographical boundaries, such as country, state, or province. Upload a data file and specify a GeoJSON in the sidebar to get started, or select 'Example' to check out a pre-loaded example. Navigate to the 'Heatmap' tab to see the heatmap, 'Table' to look at the input data, or 'GeoJSON' to see the geographical boundaries available in the currently selected GeoJSON file.
+			SOIL-HUB Maps display values based on geographical boundaries (such as country, state, or province), with coordinate points displayed on top. Select a GeoJSON and choropleth data in the sidebar to get started. Select optional coordinate points to display on top. <br>Navigate to the 'Heatmap' tab to see the heatmap, 'Table' to look at the choropleth data, or 'GeoJSON' to see the geographical boundaries available in the currently selected GeoJSON file.
 			
 			<br><br>
 			<img src="https://github.com/WishartLab/heatmapper2/wiki/assets/Geomap.png" alt="Geomap"; style="max-width:500px;">
-				 
-			<br><br><h3>Format</h3>
-			Geomap requires a data file as well as a GeoJSON.
-			<br>
-			<i>Input data can be formatted as follows:</i>
-				 <ul>
-				 <li>A 'Name' column and 'Value' column(s), where names in the 'Name' column match available geographical boundaries in the currently selected GeoJSON. Select which value column to display using the 'Value' dropdown, if there is more than one.</li>
-				 <li><u>Temporal format 1:</u> A 'Name' column, 'Value' column(s), and a 'Time' column. Rows will be grouped by time and plotted linearly. Names in the 'Name' column should match available geographical boundaries in the currently selected GeoJSON. Select which value column to display using the 'Value' dropdown, if there is more than one. (See Example 3)</li>
-				 <li><u>Temporal format 2:</u> A 'Name' column, and multiple 'Time' columns, each containing the value of the associated name at that time (i.e. each row contains a name, and multiple values of that name at different time points). 'Time' column names are parsed such that all characters up to the first whitespace indicate the time (e.g. '1990 [emissions in kilotonnes]' becomes '1990'). See Example 2. </li>
-				 </ul>
-			<br>
-			<i>Geomap heatmaps can be generated from the following file formats:</i>
-			<table style="border-spacing: 100px";>
-			<tr>
-				<th>Table Files</th>
-				<th>GeoJSON Files</th>
-			</tr>
-			<tr>
-				<td style="padding-right:50px;">
-					<li>.csv</li>
-					<li>.dat</li>
-					<li>.odf</li>
-					<li>.tab</li>
-					<li>.tsv</li>
-					<li>.txt</li>
-					<li>.xls</li>
-					<li>.xlsx</li>
-				</td>
-				<td style="vertical-align:top;">
-					<li>standard .geojson files, see <a href="https://geojson.org/"; target="_blank"; rel=”noopener noreferrer”>geojson.org</a></li>
-				</td>
-			</tr>
-			</table>
-				 
-			<br><h3>Interface</h3>
-			Remember to select or upload a GeoJSON with boundaries that match the names in your data.
+			<br>  
+ 
+			<br><h3>Troubleshooting</h3>  
+			Remember to select a GeoJSON with boundaries that match the names in your data. <br>Navigate to the 'GeoJSON' tab to see available boundaries in the GeoJSON file. Navigate to the 'Table' tab to see if your rows match these boundaries.
 		
 			<br>Click on the '?' icon beside sidebar options to read more about them.
 		""")
@@ -563,7 +624,8 @@ def server(input, output, session):
 		with ui.Progress() as p:
 
 			p.inc(message="Loading input...")
-			df_choropleth = GetDataChoropleth()
+			#df_choropleth = GetDataChoropleth()
+			df_choropleth = DataChoropleth()
 			df_coordinates = GetDataCoordinate()
 
 			if df_choropleth is None and df_coordinates is None:
@@ -573,8 +635,10 @@ def server(input, output, session):
 			###### set up background map ######
 			p.inc(message="Loading GeoJSON...")
 			try:
-				geojson = JSON()
 				# get available GeoJSON property names (e.g. name, id,...)
+				geojson_dict = JSON()
+				filepath = next(iter(geojson_dict))
+				geojson = geojson_dict[filepath]
 				properties = list(geojson['features'][0]['properties'].keys()) 
 			except Exception:
 				return ui.HTML('Make sure a GeoJSON is selected in the sidebar, <br>or upload your own following the <a href="https://geojson.org/"; target="_blank"; rel=”noopener noreferrer”>GeoJSON format</a>.')
@@ -590,47 +654,56 @@ def server(input, output, session):
 				   'contributors, &copy; <a href="https://carto.com/attribution">CARTO</a>')
 
 			# Give a placeholder map if nothing is selected, which should never really be the case.
-			if df_choropleth.empty or geojson is None: return FoliumMap((53.5213, -113.5213), tiles=map_type, attr=attribution, zoom_start=15)
+			if df_choropleth is None or geojson is None: return FoliumMap((53.5213, -113.5213), tiles=map_type, attr=attribution, zoom_start=15)
 
 			map = FoliumMap(tiles=map_type, attr=attribution, zoom_control="topleft", zoom_start=2)
 
-			###### create choropleth ######
+			###### create choropleths ######
 			if df_choropleth is not None:
 				p.inc(message="Formatting choropleth...")
-				k_col, v_col, k_prop = config.KeyColumn(), config.ValueColumn(), config.KeyProperty()
-				if k_col not in df_choropleth or v_col not in df_choropleth or k_prop not in properties: return ui.HTML("Data could not be displayed. <br>Please upload a Table file and a GeoJSON, or select an example data set in the sidebar. <br><br><i>Uploaded Table files should include: <br>a Key column (e.g. 'name', 'continent', 'country', 'location') <br>and a Value column (e.g. 'value', 'weight', 'intensity')</i>")
+				k_prop = config.KeyProperty()
+				
+				# df_choropleth is dict of choropleth dfs indexed by filepath, parse each one
+				for df_filepath in df_choropleth:
+					name_choro = GetNameFromPath(df_filepath)
+					df_choro = df_choropleth[df_filepath]
+					# HERE iiiiiiiiiiii
+					v_col_name = f"ValueColumn{name_choro}"
+					v_col = getattr(input, v_col_name)()
+					print(f"v_col: {v_col}")
+					k_col_name = f"KeyColumn{name_choro}"
+					k_col = getattr(input, k_col_name)()
+					print(f"k_col: {k_col}")
+					if k_col not in df_choro or v_col not in df_choro or k_prop not in properties: 
+						return ui.HTML("Data could not be displayed. <br>Please upload a Table file and a GeoJSON, or select an example data set in the sidebar. <br><br><i>Uploaded Table files should include: <br>a Key column (e.g. 'name', 'continent', 'country', 'location') <br>and a Value column (e.g. 'value', 'weight', 'intensity')</i>")
 
-				p.inc(message="Dropping Invalid Values...")
-				names = []
-				for feature in geojson["features"]:  # for each defined territory/polygon
-					names.append(feature["properties"][k_prop])  # collect the specified property (e.g. name)
+					p.inc(message="Dropping Invalid Values...")
+					names = []
+					for feature in geojson["features"]:  # for each defined territory/polygon
+						names.append(feature["properties"][k_prop])  # collect the specified property (e.g. name)
 
-				# remove high and low values if "range of interest" is enabled
-				to_drop = []
-				for index, key in zip(df_choropleth.index, df_choropleth[k_col]):
-					if key not in names: to_drop.append(index)
+					# remove high and low values if "range of interest" is enabled
+					to_drop = []
+					for index, key in zip(df_choro.index, df_choro[k_col]):
+						if key not in names: to_drop.append(index)
 
-				df_choropleth = df_choropleth.drop(to_drop)
-				if len(df_choropleth) == 0:
-					Error("No locations found")
-					return ui.HTML("No locations were found. <br>Please ensure your data table contains a name column, whose values match a property in the GeoJSON.")
+					df_choro = df_choro.drop(to_drop)
+					if len(df_choro) == 0:
+						Error("No locations found")
+						return ui.HTML("No locations were found. <br>Please ensure your data table contains a name column, whose values match a property in the GeoJSON.")
 
-				# Load the choropleth onto the map
-				p.inc(message="Plotting...")
-				LoadChoropleth(df_choropleth, map, geojson, k_col, v_col, k_prop, p)
+					# Load the choropleth onto the map
+					p.inc(message="Plotting...")
+					LoadChoropleth(df_choro, map, geojson, k_col, v_col, k_prop, name_choro, p)
 
 			###### create coordinate layers ######
 			if df_coordinates is not None:
-				# df_coordinate is dict  of {datapath: df}
-				# get file names & datapaths from input.CoordinateUpload()
-				datapath_to_name = {}
-				for file in input.CoordinateUpload():
-					datapath_to_name[file["datapath"]] = file["name"]
-				for data in df_coordinates:
+				for filepath in df_coordinates:
+
 					# get filename so we can build ui element ids
-					name = datapath_to_name[data].split(".")[0]
+					name = GetNameFromPath(filepath)
 					# set up dataframe
-					df_coord = df_coordinates[data]
+					df_coord = df_coordinates[filepath]
 					df_coord = df_coord.copy(deep=True)
 					
 					p.inc(message="Formatting...")
@@ -691,7 +764,10 @@ def server(input, output, session):
 	@output
 	@render.data_frame
 	def GeoJSON():
-		geojson = JSON()
+		geojson_dict = JSON()
+		filepath = next(iter(geojson_dict))
+		geojson = geojson_dict[filepath]
+
 		if geojson is None:
 			return DataFrame({'Note':[ui.HTML('Hmmm, we could not render the GeoJSON table.<br><br>Make sure a GeoJSON is selected in the right hand sidebar, <br>or upload your own following the <a href="https://geojson.org/"; target="_blank"; rel=”noopener noreferrer”>GeoJSON format</a>.')]})
 		try:	
@@ -765,51 +841,37 @@ app_ui = ui.page_fluid(
 			ui.accordion(
 				# file selection for choropleth
 				ui.accordion_panel(
-					"Select a Choropleth File",
+					"Choropleth Files",
+					ui.HTML("Select a GeoJSON file"),
+					ui.input_select(id="JSONSelection", label=None, choices=Mappings, multiple=False, selected="edmonton.geojson"),
+					
+					ui.HTML("Add choropleth data"),
 					Inlineify(
 						ui.input_select, 
 						id="Example", 
 						label=ui.input_action_link(id="ExampleInfo", label="File Info"), 
 						choices={
 							"Backyard_Hens_and_Bees.csv": "Hens & Bees (Edmonton)",
-							"example6.csv": "COVID-19 (Canada)"
+							"FormerMunicipalities.csv": "Former Municipalities (Edmonton)"
 							},
+						multiple=True,
+						selected="Backyard_Hens_and_Bees.csv",
+						selectize=True,
 						),
-					
-					ui.input_radio_buttons(id="JSONFile", label="Select a GeoJSON file", choices=["Provided", "Upload"], selected="Provided", inline=True),
-					ui.panel_conditional(
-						"input.JSONFile === 'Upload'",
-						ui.input_file("JSONUpload", None, accept=[".geojson"], multiple=False),
-					),
-					ui.panel_conditional(
-						"input.JSONFile === 'Provided'",
-						ui.input_select(id="JSONSelection", label=None, choices=Mappings, multiple=False, selected="edmonton.geojson"),
-					),
 				),
 				# file selection for latitude & longitude points
 				ui.accordion_panel(
-					"Select Coordinate Files",
-					ui.input_radio_buttons(id="CoordinateFiles", label="Select coordinate files", choices=["Example", "Upload"], selected="Example", inline=True),
-					ui.panel_conditional(
-						"input.CoordinateFiles === 'Upload'",
-						ui.input_file(
-							"CoordinateUpload", 
-							None, 
-							accept=[".csv", ".txt", ".dat", ".tsv", ".tab", ".xlsx", ".xls", ".odf"], 
-							multiple=True,
-						),
-					),
-					ui.panel_conditional(
-						"input.CoordinateFiles === 'Example'",
-						ui.input_select(
-							id="CoordinateSelection", 
-							label=None, 
-							choices={
-								"gardens.csv": "Edmonton Community Gardens",
-							}, 
-							multiple=False, 
-							selected="gardens.csv",
-							),
+					"Coordinate Files",
+					ui.input_select(
+						id="CoordinateSelection", 
+						label=None, 
+						choices={
+							"gardens.csv": "Edmonton Community Gardens",
+							"random_points.csv": "Random Points",
+						}, 
+						multiple=True, 
+						selected=None,
+						selectize=True,
 					),
 				)
 			),
@@ -825,8 +887,8 @@ app_ui = ui.page_fluid(
 					ui.accordion_panel(
 						"Choropleth Settings",
 						ui.HTML("<b>Columns/Properties</b>"),
-						config.KeyColumn.UI(ui.input_select, id="KeyColumn", label="Name Column", choices=[], tooltip="Specify a column in your data that contains location names. These location names must correspond to location names in the GeoJSON file. Click on the 'GeoJSON' tab in the main view area to see location names in the currently selected GeoJSON file."),
-						config.ValueColumn.UI(ui.input_select, id="ValueColumn", label="Value Column", choices=[], tooltip="Specify a column containing the data to plot."),
+						# config.KeyColumn.UI(ui.input_select, id="KeyColumn", label="Name Column", choices=[], tooltip="Specify a column in your data that contains location names. These location names must correspond to location names in the GeoJSON file. Click on the 'GeoJSON' tab in the main view area to see location names in the currently selected GeoJSON file."),
+						# config.ValueColumn.UI(ui.input_select, id="ValueColumn", label="Value Column", choices=[], tooltip="Specify a column containing the data to plot."),
 						config.KeyProperty.UI(ui.input_select, id="KeyProperty", label="GeoJSON Property", choices=[], tooltip="Select a property in the GeoJSON file that corresponds to the location names in your data. Click on the 'GeoJSON' tab in the main view area to see available properties in the currently selected GeoJSON file."),
 						
 						ui.HTML("<b>Heatmap</b>"),
@@ -851,58 +913,3 @@ app_ui = ui.page_fluid(
 )
 
 app = App(app_ui, server)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
