@@ -301,7 +301,6 @@ class Cache:
 			if p: p.inc(message=f"Handling {p_name}")
 			# load example files from datapath
 			all_n = []
-			print(f"load file: {file}")
 			for i in range(len(file)):
 				#n = str(file[i]["datapath"])
 				n = file[i]  # filename

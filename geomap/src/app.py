@@ -16,22 +16,15 @@
 
 
 from shiny import App, reactive, render, ui
-from folium import Map as FoliumMap, Choropleth, Circle, GeoJson, Rectangle
+from folium import Map as FoliumMap, Circle, GeoJson, Rectangle
 from folium.features import GeoJsonTooltip, GeoJsonPopup
-from folium.plugins import TimeSliderChoropleth, HeatMap as FoliumHeatMap, HeatMapWithTime
+from folium.plugins import HeatMap as FoliumHeatMap
 from geopandas import GeoDataFrame
 from pandas import DataFrame
-from branca.colormap import linear, LinearColormap, StepColormap
-from pathlib import Path
-from json import loads
-from datetime import datetime
-from time import mktime
+from branca.colormap import LinearColormap
 from scipy.stats import gaussian_kde
-from scipy.interpolate import griddata
-from numpy import vstack, linspace, meshgrid
-from math import sqrt
+from numpy import vstack
 import re
-import time
 
 from shared import Cache, Colors, Inlineify, NavBar, MainTab, Pyodide, Filter, ColumnType, TableOptions, Raw, InitializeConfig, ColorMaps, Error, Update, Msg, File
 from geojson import Mappings
@@ -41,7 +34,7 @@ try:
 except ImportError:
 	from config import config
 
-# Fine, Shiny
+# Required for Shiny
 import branca, certifi, xyzservices
 
 URL = f"{Raw}/geomap/data/" if Pyodide else "../data/"
@@ -679,12 +672,9 @@ def server(input, output, session):
 					df_choro = df_choropleth[df_filepath]
 					# HERE iiiiiiiiiiii
 					v_col_name = f"ValueColumn{name_choro}"
-					print(f"GenerateHeatmap:\tValueColumn{name_choro}")
 					v_col = getattr(input, v_col_name)()
-					print(f"v_col: {v_col}")
 					k_col_name = f"KeyColumn{name_choro}"
 					k_col = getattr(input, k_col_name)()
-					print(f"k_col: {k_col}")
 					if k_col not in df_choro or v_col not in df_choro or k_prop not in properties: 
 						return ui.HTML("Data could not be displayed. <br>Please upload a Table file and a GeoJSON, or select an example data set in the sidebar. <br><br><i>Uploaded Table files should include: <br>a Key column (e.g. 'name', 'continent', 'country', 'location') <br>and a Value column (e.g. 'value', 'weight', 'intensity')</i>")
 
@@ -878,7 +868,7 @@ app_ui = ui.page_fluid(
 						label=None, 
 						choices={
 							"gardens.csv": "Edmonton Community Gardens",
-							"random_points.csv": "Random Points",
+							"foodbanks.csv": "Edmonton Food Banks",
 						}, 
 						multiple=True, 
 						selected=None,

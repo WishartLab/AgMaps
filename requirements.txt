@@ -2,6 +2,7 @@ shiny==1.2.1
 shinylive==0.7.3
 matplotlib==3.10.0
 scipy==1.15.0
+geopandas
 pandas==2.2.3
 openpyxl==3.1.5
 folium==0.19.4
