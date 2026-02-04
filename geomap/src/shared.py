@@ -22,9 +22,11 @@ from pandas import DataFrame, read_csv, read_excel, read_table
 import openpyxl
 
 # Used for fetching web resources
-URL = "https://wishartlab.github.io/agmaps"
-Raw = "https://raw.githubusercontent.com/wishartlab/agmaps/main"
+URL = "https://wishartlab.github.io/AgMaps/"
+Raw = "https://raw.githubusercontent.com/wishartlab/AgMaps/main"
 
+Server = "http://server.heatmapper2.ca"
+Port = 8000
 
 # Icon to display for tooltips
 TooltipIcon = ui.HTML(
@@ -34,6 +36,7 @@ TooltipIcon = ui.HTML(
 
 # Detect the running environment
 if "pyodide" in modules:
+	print("pyodide in modules")
 	from pyodide.http import pyfetch
 	Pyodide = True
 	async def fetch(url):
@@ -43,6 +46,7 @@ if "pyodide" in modules:
 			Error("Could not download file")
 			return None
 else:
+	print("pyodide NOT in modules")
 	from urllib.request import urlopen
 	Pyodide = False
 	async def fetch(url):
@@ -179,6 +183,7 @@ class Cache:
 		@param path: Path to file
 		@returns: An object.
 		"""
+		print(f"PATH: {path}")
 		suffix = path.suffix
 		if suffix == ".geojson": return loads(path.open().read())
 		if suffix == ".csv": return Cache.HandleDataFrame(path, read_csv, p)

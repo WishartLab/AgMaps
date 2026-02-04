@@ -7,23 +7,26 @@
 # It can be run with the following command within this directory:
 #		shinylive export . [site]
 # Where [site] is the destination of the site folder.
+# From the site folder, run 
+# 		python3 -m http.server --directory site --bind localhost 8008
 #
 # -----RUN PYTHON-----
 # If you would rather deploy the application as a PyShiny application,
 # run the following command within this directory:
-#		shiny run
+#		shiny run app.py
 #
 
 
-from shiny import App, reactive, render, ui
+from branca.colormap import LinearColormap
 from folium import Map as FoliumMap, Circle, GeoJson, Rectangle
 from folium.features import GeoJsonTooltip, GeoJsonPopup
 from folium.plugins import HeatMap as FoliumHeatMap
 from geopandas import GeoDataFrame
-from pandas import DataFrame
-from branca.colormap import LinearColormap
-from scipy.stats import gaussian_kde
 from numpy import vstack
+from pandas import DataFrame
+from scipy.stats import gaussian_kde
+from shiny import App, reactive, render, ui
+
 import re
 
 from shared import Cache, Colors, Inlineify, NavBar, MainTab, Pyodide, Filter, ColumnType, TableOptions, Raw, InitializeConfig, ColorMaps, Error, Update, Msg, File
@@ -48,6 +51,7 @@ def server(input, output, session):
 	InfoChoropleth = {
 		"Backyard_Hens_and_Bees.csv": '''<u>Input type:</u> .csv Data <br><u>Contents:</u> Number of properties with hens or bees in Edmonton, by neighbourhood.''',
 		"FormerMunicipalities.csv": '''<u>Input type:</u> .csv Data<br> <u>Contents:</u> Former municipalities absorbed by the city of Edmonton. <br><u>Source:</u> <a href="https://en.wikipedia.org/wiki/List_of_neighbourhoods_in_Edmonton"; target="_blank">Wikipedia</a>''',
+		"soilgroups.csv": '''<u>Input type:</u> .csv Data <br><u>Contents:</u> The average organic matter per soil group.''',
 	}
 
 	def HandleData(paths:list, p=None):
@@ -416,6 +420,7 @@ def server(input, output, session):
 		geojson_df = GeoDataFrame.from_features(geojson, crs="EPSG:4326")
 		# merge with data df based on k_prop and k_col
 		merged = geojson_df.merge(df, how="left", left_on=k_prop, right_on=k_col)
+		print(f"merged:\n{merged.columns}")
 
 		opacity = config.Opacity()
 		# opacity_name = f"OpacityChoro{name}"
@@ -423,6 +428,7 @@ def server(input, output, session):
 		
 		df_dict = df.set_index(k_col)[v_col]
 		df_dict = df_dict.to_dict()
+		#print(f"df_dict:\n{df_dict}")
 
 		# add a popup that appears on click
 		popup = GeoJsonPopup(
@@ -853,7 +859,8 @@ app_ui = ui.page_fluid(
 						label=ui.input_action_link(id="ExampleInfo", label="File Info"), 
 						choices={
 							"Backyard_Hens_and_Bees.csv": "Hens & Bees (Edmonton)",
-							"FormerMunicipalities.csv": "Former Municipalities (Edmonton)"
+							"FormerMunicipalities.csv": "Former Municipalities (Edmonton)",
+							"soilgroups.csv": "Organic Matter by Soil Group"
 							},
 						multiple=True,
 						selected="Backyard_Hens_and_Bees.csv",
