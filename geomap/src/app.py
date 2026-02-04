@@ -16,18 +16,20 @@
 #		shiny run app.py
 #
 
-
 from branca.colormap import LinearColormap
 from folium import Map as FoliumMap, Circle, GeoJson, Rectangle
 from folium.features import GeoJsonTooltip, GeoJsonPopup
 from folium.plugins import HeatMap as FoliumHeatMap
+from folium.plugins import TimeSliderChoropleth
 from geopandas import GeoDataFrame
 from numpy import vstack
 from pandas import DataFrame
 from scipy.stats import gaussian_kde
 from shiny import App, reactive, render, ui
 
+from datetime import datetime
 import re
+from time import mktime
 
 from shared import Cache, Colors, Inlineify, NavBar, MainTab, Pyodide, Filter, ColumnType, TableOptions, Raw, InitializeConfig, ColorMaps, Error, Update, Msg, File
 from geojson import Mappings
@@ -406,8 +408,8 @@ def server(input, output, session):
 		@param map: The Folium map
 		@param geojson: The geojson that contains territory info
 		@param k_col: The name of the column within df that contains names
-		@param v_col: the name of the column within df that contains the values to plot.
-		@param k_prop: 
+		@param v_col: The name of the column within df that contains the values to plot
+		@param k_prop: The property of the geojson to be used as a name
 		@param name(str): name of the file that data was pulled from
 		"""
 		# check if layer is disabled
@@ -420,7 +422,6 @@ def server(input, output, session):
 		geojson_df = GeoDataFrame.from_features(geojson, crs="EPSG:4326")
 		# merge with data df based on k_prop and k_col
 		merged = geojson_df.merge(df, how="left", left_on=k_prop, right_on=k_col)
-		print(f"merged:\n{merged.columns}")
 
 		opacity = config.Opacity()
 		# opacity_name = f"OpacityChoro{name}"
@@ -428,7 +429,6 @@ def server(input, output, session):
 		
 		df_dict = df.set_index(k_col)[v_col]
 		df_dict = df_dict.to_dict()
-		#print(f"df_dict:\n{df_dict}")
 
 		# add a popup that appears on click
 		popup = GeoJsonPopup(
@@ -450,6 +450,8 @@ def server(input, output, session):
 			if len(selected_colors_num) < 2:
 				selected_colors_num += selected_colors_num
 			colormap = LinearColormap(selected_colors_num, vmin=vmin, vmax=vmax)
+
+			#TODO: sub 'name' with k_prop???
 			GeoJson(
 				merged,
 				style_function=lambda x:
@@ -494,6 +496,81 @@ def server(input, output, session):
 				#tooltip=tooltip,
 				popup=popup,
 			).add_to(map)
+
+	
+	def LoadTemporalChoropleth(df, map, geojson, k_col, v_col, k_prop, name, p):
+		"""
+		@brief Applies a TimeSliderChoropleth to a Folium map
+		@param df: The DataFrame that contains data to plot
+		@param map: The Folium map
+		@param geojson: The geojson that contains territory information
+		@param k_col: The name of the column within df that contains names
+		@param v_col: The name of the column within df that contains the values to plot
+		@param k_prop: The property of the geojson to be used as a name
+		@info df can either contain a Time column, or all non key-columns will be handled as time columns.
+		"""
+		print("loading temporal choropleth")
+		# check if layer is disabled
+		disable_name = f"Disable{name}"
+		disable = getattr(input, disable_name)()
+		if disable:
+			return
+
+		def Timestamp(time):
+			year, month, day = 1970, 1, 1
+			try:
+				if len(time) >= 1: year = int(time[0])
+				if len(time) >= 2: month = int(time[1])
+				if len(time) >= 3: day = int(time[2])
+			except ValueError: pass
+			return str(round(mktime(datetime(year, month, day).timetuple())))
+		
+		# Check if we have a dedicated time column, or separate columns for each time slot.
+		column = Filter(df.columns, ColumnType.Time)
+		opacity = config.Opacity()
+		# opacity_name = f"OpacityChoro{name}"
+		# opacity = getattr(input, opacity_name)()
+
+		values = df[v_col].unique()
+		vmin = min(values)
+		vmax = max(values)
+		selected_colors_num_ui = f"{name}ColorSelect"
+		selected_colors_num = getattr(input, selected_colors_num_ui)()
+		if len(selected_colors_num) < 2:
+			selected_colors_num += selected_colors_num
+		colormap = LinearColormap(selected_colors_num, vmin=vmin, vmax=vmax)
+
+		style = {}
+		if column:  # dedicated time column
+			p.inc(message="Grouping by Date...")
+			grouped = df.groupby(k_col)
+
+			p.inc(message="Formatting...")
+			for i, (i_name, group) in enumerate(grouped):
+				style[i] = {}
+				for val_time, value in zip(group[column], group[v_col]):
+					timestamp = Timestamp(str(val_time).split("-"))
+					if timestamp is None: return
+
+					style[i][timestamp] = {"color": colormap(value), "opacity": opacity}
+				for feature in geojson["features"]:
+					if feature["properties"][k_prop] == i_name:
+						feature["id"] = i
+
+		p.inc(message="Creating Choropleth...")
+		TimeSliderChoropleth(
+			data=geojson,
+			styledict=style,
+		).add_to(map)
+		colormap.add_to(map)
+
+		# # add a popup that appears on click
+		# popup = GeoJsonPopup(
+		# 	fields=[k_prop, v_col],
+		# 	aliases=["",""],
+		# 	localize=True,
+		# 	labels=True,
+		# )
 
 
 	def GenerateCoordinateMap(df, map, name, val_col, lat_col, lon_col):
@@ -676,7 +753,6 @@ def server(input, output, session):
 				for df_filepath in df_choropleth:
 					name_choro = GetNameFromPath(df_filepath)
 					df_choro = df_choropleth[df_filepath]
-					# HERE iiiiiiiiiiii
 					v_col_name = f"ValueColumn{name_choro}"
 					v_col = getattr(input, v_col_name)()
 					k_col_name = f"KeyColumn{name_choro}"
@@ -701,7 +777,8 @@ def server(input, output, session):
 
 					# Load the choropleth onto the map
 					p.inc(message="Plotting...")
-					LoadChoropleth(df_choro, map, geojson, k_col, v_col, k_prop, name_choro, p)
+					if input.Temporal(): LoadTemporalChoropleth(df_choro, map, geojson, k_col, v_col, k_prop, name_choro, p)
+					else: LoadChoropleth(df_choro, map, geojson, k_col, v_col, k_prop, name_choro, p)
 
 			###### create coordinate layers ######
 			if df_coordinates is not None:
@@ -900,6 +977,7 @@ app_ui = ui.page_fluid(
 						config.KeyProperty.UI(ui.input_select, id="KeyProperty", label="GeoJSON Property", choices=[], tooltip="Select a property in the GeoJSON file that corresponds to the location names in your data. Click on the 'GeoJSON' tab in the main view area to see available properties in the currently selected GeoJSON file."),
 						
 						ui.HTML("<b>Heatmap</b>"),
+						config.Temporal.UI(ui.input_checkbox, id="Temporal", label="Temporal", tooltip="Specify if the input data should be interpreted over time, which can be navigated with a time slider embedded into the map. Temporal maps require an explicit time column for all choropleth and coordinate values."),
 						config.MapType.UI(ui.input_select, id="MapType", label="Background Map", choices={"CartoDB Positron": "Simple Map", "OpenStreetMap": "Street Map", "Esri World Imagery": "Satellite"}, tooltip="Specify the background map to plot your data on. CartoDB is a simpler map, while OSM is more highly annotated."),
 						config.Opacity.UI(ui.input_slider, id="Opacity", label="Choropleth Opacity", min=0.0, max=1.0, step=0.1, tooltip="Specify the opacity of the heatmap. 1.0 indicates full opacity, while lower values make the background map more visible."),
 					),
