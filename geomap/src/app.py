@@ -54,6 +54,10 @@ def server(input, output, session):
 		"Backyard_Hens_and_Bees.csv": '''<u>Input type:</u> .csv Data <br><u>Contents:</u> Number of properties with hens or bees in Edmonton, by neighbourhood.''',
 		"FormerMunicipalities.csv": '''<u>Input type:</u> .csv Data<br> <u>Contents:</u> Former municipalities absorbed by the city of Edmonton. <br><u>Source:</u> <a href="https://en.wikipedia.org/wiki/List_of_neighbourhoods_in_Edmonton"; target="_blank">Wikipedia</a>''',
 		"soilgroups.csv": '''<u>Input type:</u> .csv Data <br><u>Contents:</u> The average organic matter per soil group.''',
+		"precipitation.csv": '''Precipitation by County (month)''',
+		"precipitation_year.csv": '''Precipitation by County (year)''',
+		"avg_precip_soilgroup.csv":'''Precipitation by Soil Group''',
+		"yield_county.csv": '''Average Yield by County''',
 	}
 
 	def HandleData(paths:list, p=None):
@@ -937,7 +941,11 @@ app_ui = ui.page_fluid(
 						choices={
 							"Backyard_Hens_and_Bees.csv": "Hens & Bees (Edmonton)",
 							"FormerMunicipalities.csv": "Former Municipalities (Edmonton)",
-							"soilgroups.csv": "Organic Matter by Soil Group"
+							"soilgroups.csv": "Organic Matter by Soil Group",
+							"precipitation.csv": "Precipitation by County (month)",
+							"precipitation_year.csv": "Precipitation by County (year)",
+							"avg_precip_soilgroup.csv": "Precipitation by Soil Group",
+							"yield_county.csv": "Average Yield by County"
 							},
 						multiple=True,
 						selected="Backyard_Hens_and_Bees.csv",
@@ -953,6 +961,7 @@ app_ui = ui.page_fluid(
 						choices={
 							"gardens.csv": "Edmonton Community Gardens",
 							"foodbanks.csv": "Edmonton Food Banks",
+							"sukanta_data.csv": "Sukanta soil data",
 						}, 
 						multiple=True, 
 						selected=None,

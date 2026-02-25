@@ -1,98 +1,63 @@
-Territory,Value,Time
-Gray Luvisols (4),6.6,1998
-Gray Luvisols (4),11.14666667,1999
-Gray Luvisols (4),12.47,2000
-Gray Luvisols (4),9.166666667,2001
-Gray Luvisols (4),10.65,2002
-Gray Luvisols (4),8.161666667,2003
-Gray Luvisols (4),9.966666667,2004
-Gray Luvisols (4),8.583333333,2005
-Gray Luvisols (4),5.166666667,2006
-Gray Luvisols (4),5.851666667,2020
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",7.177142857,1998
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",7.319166667,1999
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",7.089583333,2000
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",5.989166667,2001
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",5.75625,2002
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",6.278958333,2003
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",6.39375,2004
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",6.222916667,2005
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",6.55625,2006
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",2.9,2012
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",5.77,2019
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (6)",7.363333333,2020
-Gray Luvisols (9),2.85,2012
-Gray Luvisols (9),5.287272727,2019
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",3.959166667,1998
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",4.168333333,1999
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",4.315833333,2000
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",4.59,2001
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",3.845833333,2002
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",4.04125,2003
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",3.666666667,2004
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",4.05,2005
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",4.079166667,2006
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",3.8,2019
-"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (10)",3.305833333,2020
-"Gray Luvisols, Organics (11)",5.89,1998
-"Gray Luvisols, Organics (11)",6.46,1999
-"Gray Luvisols, Organics (11)",5.616666667,2000
-"Gray Luvisols, Organics (11)",5.7,2001
-"Gray Luvisols, Organics (11)",5.8,2002
-"Gray Luvisols, Organics (11)",5.675,2003
-"Gray Luvisols, Organics (11)",5.566666667,2004
-"Gray Luvisols, Organics (11)",5.7,2005
-"Gray Luvisols, Organics (11)",11.48333333,2020
-"Gray Luvisols, Organics (13)",4.2,1998
-"Gray Luvisols, Organics (13)",3.54,1999
-"Gray Luvisols, Organics (13)",4.32,2000
-"Gray Luvisols, Organics (13)",2.425,2001
-"Gray Luvisols, Organics (13)",4.633333333,2002
-"Gray Luvisols, Organics (13)",4.533333333,2003
-"Gray Luvisols, Organics (13)",3.3,2004
-"Gray Luvisols, Organics (13)",3.583333333,2005
-"Gray Luvisols, Organics (13)",3.066666667,2006
-"Gray Luvisols, Organics (13)",5.67,2020
-Black Chernozemics (14),8.104285714,1998
-Black Chernozemics (14),7.772222222,1999
-Black Chernozemics (14),8.268148148,2000
-Black Chernozemics (14),6.897962963,2001
-Black Chernozemics (14),7.261111111,2002
-Black Chernozemics (14),7.571111111,2003
-Black Chernozemics (14),7.133333333,2004
-Black Chernozemics (14),7.481481481,2005
-Black Chernozemics (14),6.089583333,2006
-Black Chernozemics (14),9.346388889,2019
-Black Chernozemics (14),7.563333333,2020
-Dark Brown Chernozemics (16),4.452222222,1998
-Dark Brown Chernozemics (16),4.43,1999
-Dark Brown Chernozemics (16),4.498148148,2000
-Dark Brown Chernozemics (16),4.185740741,2001
-Dark Brown Chernozemics (16),3.925925926,2002
-Dark Brown Chernozemics (16),4.307777778,2003
-Dark Brown Chernozemics (16),4.131481481,2004
-Dark Brown Chernozemics (16),4.027777778,2005
-Dark Brown Chernozemics (16),5.024074074,2006
-Dark Brown Chernozemics (16),4.942,2019
-Dark Brown Chernozemics (16),5.776666667,2020
-Brown Chernozemics (17),2.552222222,1998
-Brown Chernozemics (17),2.295555556,1999
-Brown Chernozemics (17),2.412380952,2000
-Brown Chernozemics (17),2.431428571,2001
-Brown Chernozemics (17),2.247619048,2002
-Brown Chernozemics (17),2.510714286,2003
-Brown Chernozemics (17),2.595238095,2004
-Brown Chernozemics (17),2.319047619,2005
-Brown Chernozemics (17),2.247368421,2006
-Brown Chernozemics (17),2.701388889,2019
-Brown Chernozemics (17),3.82,2020
-Dark Brown Chernozemics (19),1.886666667,1998
-Dark Brown Chernozemics (19),2.04,1999
-Dark Brown Chernozemics (19),2.363333333,2000
-Dark Brown Chernozemics (19),2.193333333,2001
-Dark Brown Chernozemics (19),1.75,2002
-Dark Brown Chernozemics (19),1.898333333,2003
-Dark Brown Chernozemics (19),2.083333333,2004
-Dark Brown Chernozemics (19),1.866666667,2005
-Dark Brown Chernozemics (19),2.166666667,2006
-Dark Brown Chernozemics (19),3.596666667,2019
+Territory,Value,Year
+"Brunisols, Gray Luvisols (18)",6.133333333,2012
+"Brunisols, Gray Luvisols (18)",2.6,2013
+"Brunisols, Gray Luvisols (18)",4.5,2015
+"Brunisols, Gray Luvisols (18)",6.06,2016
+"Brunisols, Gray Luvisols (18)",7.4,2017
+"Brunisols, Gray Luvisols (18)",4.825,2018
+"Brunisols, Gray Luvisols (18)",6.114285714,2019
+"Brunisols, Gray Luvisols (18)",10.23333333,2020
+Brown Chernozemics (17),2.781460674,2012
+Brown Chernozemics (17),2.723425693,2013
+Brown Chernozemics (17),3.24953271,2014
+Brown Chernozemics (17),2.876027397,2015
+Brown Chernozemics (17),3.050413223,2016
+Brown Chernozemics (17),2.928947368,2017
+Brown Chernozemics (17),2.65840708,2018
+Brown Chernozemics (17),3.051772727,2019
+Brown Chernozemics (17),4.081515152,2020
+Dark Brown Chernozemics (16),3.375283843,2012
+Dark Brown Chernozemics (16),3.310857909,2013
+Dark Brown Chernozemics (16),3.742105263,2014
+Dark Brown Chernozemics (16),3.729694836,2015
+Dark Brown Chernozemics (16),4.47568306,2016
+Dark Brown Chernozemics (16),4.62737819,2017
+Dark Brown Chernozemics (16),4.272277228,2018
+Dark Brown Chernozemics (16),4.393072824,2019
+Dark Brown Chernozemics (16),5.196841004,2020
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.406323185,2012
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.533629442,2013
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.198363095,2014
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.864188577,2015
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",7.254232425,2016
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.589661164,2017
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.395808383,2018
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.348596939,2019
+"Dark Gray Chernozemics, Dark Gray - Gray Luvisols (15)",6.212568337,2020
+Black Chernozemics (14),6.972144847,2012
+Black Chernozemics (14),6.935918854,2013
+Black Chernozemics (14),6.49491018,2014
+Black Chernozemics (14),6.713127413,2015
+Black Chernozemics (14),6.776308345,2016
+Black Chernozemics (14),7.105011219,2017
+Black Chernozemics (14),7.489801908,2018
+Black Chernozemics (14),7.821963972,2019
+Black Chernozemics (14),7.489833597,2020
+"Gray Luvisols, Organics (13)",3.109090909,2012
+"Gray Luvisols, Organics (13)",4.336363636,2013
+"Gray Luvisols, Organics (13)",4.166666667,2014
+"Gray Luvisols, Organics (13)",2.866666667,2016
+"Gray Luvisols, Organics (13)",7.275,2017
+"Gray Luvisols, Organics (13)",5.485714286,2018
+"Gray Luvisols, Organics (13)",4.9,2019
+"Gray Luvisols, Organics (13)",4.02,2020
+Gray Luvisols (7),9.790384615,2012
+Gray Luvisols (7),6.044736842,2013
+Gray Luvisols (7),6.977272727,2014
+Gray Luvisols (7),7.256862745,2015
+Gray Luvisols (7),5.191111111,2016
+Gray Luvisols (7),6.332692308,2017
+Gray Luvisols (7),6.111864407,2018
+Gray Luvisols (7),6.1,2019
+Gray Luvisols (7),7.432446809,2020
+"Organic Cryosols, Gray Luvisols (2)",3.366666667,2012
