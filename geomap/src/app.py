@@ -58,6 +58,8 @@ def server(input, output, session):
 		"precipitation_year.csv": '''Precipitation by County (year)''',
 		"avg_precip_soilgroup.csv":'''Precipitation by Soil Group''',
 		"yield_county.csv": '''Average Yield by County''',
+		"grasshopper.csv": "Average grasshopper count by subpasture",
+		"plant_height.csv": "Average plant height by subpasture",
 	}
 
 	def HandleData(paths:list, p=None):
@@ -460,7 +462,7 @@ def server(input, output, session):
 				merged,
 				style_function=lambda x:
 				{
-					"fillColor": colormap(df_dict[x['properties']['name']]) if x['properties']['name'] in df_dict else "transparent",
+					"fillColor": colormap(df_dict[x['properties'][k_prop]]) if x['properties'][k_prop] in df_dict else "transparent",
 					"color": "black",
 					"weight": 0.5,
 					"fillOpacity": opacity,
@@ -945,7 +947,9 @@ app_ui = ui.page_fluid(
 							"precipitation.csv": "Precipitation by County (month)",
 							"precipitation_year.csv": "Precipitation by County (year)",
 							"avg_precip_soilgroup.csv": "Precipitation by Soil Group",
-							"yield_county.csv": "Average Yield by County"
+							"yield_county.csv": "Average Yield by County",
+							"grasshopper.csv": "Grasshopper Counts",
+							"plant_height.csv": "Plant Height",
 							},
 						multiple=True,
 						selected="Backyard_Hens_and_Bees.csv",
